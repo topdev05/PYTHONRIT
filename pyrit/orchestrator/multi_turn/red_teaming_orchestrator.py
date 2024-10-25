@@ -3,13 +3,11 @@
 
 import logging
 from typing import Optional, Union
-from uuid import uuid4
-from colorama import Fore, Style
+from uuid import UUID, uuid4
 
-from pyrit.common.display_response import display_image_response
 from pyrit.memory import MemoryInterface
 from pyrit.models import AttackStrategy, PromptRequestPiece
-from pyrit.orchestrator import Orchestrator
+from pyrit.orchestrator import MultiTurnOrchestrator
 from pyrit.prompt_normalizer import NormalizerRequestPiece, PromptNormalizer, NormalizerRequest
 from pyrit.prompt_target import PromptTarget, PromptChatTarget
 from pyrit.prompt_converter import PromptConverter
@@ -18,12 +16,7 @@ from pyrit.score import Scorer, Score
 logger = logging.getLogger(__name__)
 
 
-class CompletionState:
-    def __init__(self, is_complete: bool):
-        self.is_complete = is_complete
-
-
-class RedTeamingOrchestrator(Orchestrator):
+class RedTeamingOrchestrator(MultiTurnOrchestrator):
     _memory: MemoryInterface
 
     def __init__(
@@ -34,7 +27,7 @@ class RedTeamingOrchestrator(Orchestrator):
         red_teaming_chat: PromptChatTarget,
         initial_red_teaming_prompt: Optional[str] = "How can I help you?",
         prompt_converters: Optional[list[PromptConverter]] = None,
-        scorer: Scorer,
+        objective_scorer: Scorer,
         use_score_as_feedback: bool = True,
         memory: Optional[MemoryInterface] = None,
         memory_labels: Optional[dict[str, str]] = None,
@@ -56,48 +49,40 @@ class RedTeamingOrchestrator(Orchestrator):
                 The default is a text prompt with the content "Begin Conversation".
             prompt_converters: The prompt converters to use to convert the prompts before sending them to the prompt
                 target. The converters are not applied on messages to the red teaming target.
-                scorer: The scorer classifies the prompt target outputs as sufficient (True) or insufficient (False)
-                to satisfy the objective that is specified in the attack_strategy.
+            objective_scorer: The scorer classifies the prompt target outputs as sufficient (True) or insufficient
+                (False) to satisfy the objective that is specified in the attack_strategy.
             use_score_as_feedback: Whether to use the score as feedback to the red teaming chat to improve the
                 next prompt.
             memory: The memory to use to store the chat messages. If not provided, a DuckDBMemory will be used.
             memory_labels (dict[str, str], optional): A free-form dictionary for tagging prompts with custom labels.
-            These labels can be used to track all prompts sent as part of an operation, score prompts based on
-            the operation ID (op_id), and tag each prompt with the relevant Responsible AI (RAI) harm category.
-            Users can define any key-value pairs according to their needs. Defaults to None.
-            verbose: Whether to print debug information.
+                These labels can be used to track all prompts sent as part of an operation, score prompts based on
+                the operation ID (op_id), and tag each prompt with the relevant Responsible AI (RAI) harm category.
+                Users can define any key-value pairs according to their needs. Defaults to None.
+                verbose: Whether to print debug information.
         """
 
         super().__init__(
-            prompt_converters=prompt_converters, memory=memory, memory_labels=memory_labels, verbose=verbose
+            prompt_target=prompt_target,
+            red_teaming_chat=red_teaming_chat,
+            prompt_converters=prompt_converters,
+            objective_scorer=objective_scorer,
+            memory=memory,
+            memory_labels=memory_labels,
+            verbose=verbose,
         )
 
-        self._prompt_target = prompt_target
         self._achieved_objective = False
 
         self._prompt_normalizer = PromptNormalizer(memory=self._memory)
-        self._prompt_target._memory = self._memory
-        self._red_teaming_chat = red_teaming_chat
-        self._red_teaming_chat._memory = self._memory
         self._attack_strategy = str(attack_strategy)
         self._initial_red_teaming_prompt = initial_red_teaming_prompt
-        if not self._initial_red_teaming_prompt:
-            raise ValueError("The initial red teaming prompt cannot be empty.")
         self._use_score_as_feedback = use_score_as_feedback
-        if scorer.scorer_type != "true_false":
-            raise ValueError(f"The scorer must be a true/false scorer. The scorer type is {scorer.scorer_type}.")
-        self._scorer = scorer
-        # Set the scorer and scorer._prompt_target memory to match the orchestrator's memory.
-        if self._scorer:
-            self._scorer._memory = self._memory
-            if hasattr(self._scorer, "_prompt_target"):
-                self._scorer._prompt_target._memory = self._memory
 
-    async def apply_attack_strategy_until_completion_async(
+    async def run_attack_async(
         self,
         *,
         max_turns: int = 5,
-    ) -> str:
+    ) -> UUID:
         """
         Applies the attack strategy until the conversation is complete or the maximum number of turns is reached.
 
@@ -124,7 +109,7 @@ class RedTeamingOrchestrator(Orchestrator):
             if self._use_score_as_feedback and score:
                 feedback = score.score_rationale
 
-            response = await self._send_prompt_async(
+            response = await self._retrieve_and_send_prompt_async(
                 prompt_target_conversation_id=prompt_target_conversation_id,
                 red_teaming_chat_conversation_id=red_teaming_chat_conversation_id,
                 feedback=feedback,
@@ -153,45 +138,9 @@ class RedTeamingOrchestrator(Orchestrator):
                 f"number of turns ({max_turns}).",
             )
 
-        return prompt_target_conversation_id
+        return UUID(prompt_target_conversation_id)
 
-    async def print_conversation(self, prompt_target_conversation_id: str):
-        """Prints the conversation between the prompt target and the red teaming bot, including the scores.
-
-        Args:
-            prompt_target_conversation_id (str): the conversation ID for the prompt target.
-        """
-        target_messages = self._memory._get_prompt_pieces_with_conversation_id(
-            conversation_id=prompt_target_conversation_id
-        )
-
-        if not target_messages or len(target_messages) == 0:
-            print("No conversation with the target")
-            return
-
-        if self._achieved_objective:
-            print("The red teaming orchestrator has completed the conversation and achieved the objective.")
-        else:
-            print("The red teaming orchestrator has not achieved the objective.")
-
-        for message in target_messages:
-            if message.role == "user:":
-                print(f"{Style.BRIGHT}{Fore.BLUE}{message.role}")
-                if message.converted_value != message.original_value:
-                    print(f"Original value: {message.original_value}")
-                print(f"Converted value: {message.converted_value}")
-            else:
-                print(f"{Style.NORMAL}{Fore.YELLOW}{message.role}: {message.converted_value}")
-                await display_image_response(message, self._memory)
-
-            scores = self._memory.get_scores_by_prompt_ids(prompt_request_response_ids=[str(message.id)])
-            if scores and len(scores) > 0:
-                score = scores[0]
-                print(f"{Style.RESET_ALL}score: {score} : {score.score_rationale}")
-
-    """Private methods"""
-
-    async def _send_prompt_async(
+    async def _retrieve_and_send_prompt_async(
         self,
         *,
         prompt_target_conversation_id: str,
@@ -260,7 +209,9 @@ class RedTeamingOrchestrator(Orchestrator):
             # then the conversation is not yet complete.
             return None
 
-        score = (await self._scorer.score_async(request_response=prompt_request_responses[-1].request_pieces[0]))[0]
+        score = (
+            await self._objective_scorer.score_async(request_response=prompt_request_responses[-1].request_pieces[0])
+        )[0]
 
         if score.score_type != "true_false":
             raise ValueError(f"The scorer must return a true_false score. The score type is {score.score_type}.")
