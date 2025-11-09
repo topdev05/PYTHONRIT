@@ -91,9 +91,9 @@ class RPCClient:
         print("Reconnecting to server...")
         self.start()
 
-    def _receive_prompt(self, prompt_request: MessagePiece, task: Optional[str] = None):
-        print(f"Received prompt: {prompt_request}")
-        self._prompt_received = prompt_request
+    def _receive_prompt(self, message_piece: MessagePiece, task: Optional[str] = None):
+        print(f"Received prompt: {message_piece}")
+        self._prompt_received = message_piece
         self._prompt_received_sem.release()
 
     def _ping(self):
