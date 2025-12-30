@@ -10,9 +10,23 @@
 # ---
 
 # %% [markdown]
-# # 3. Audio Converters
+# # 2. Audio Converters
 #
-# Converters can also be multi-modal. Because it's an abstract function used interchangeably on a single `MessagePiece`, it can only deal with one input value and type per time, and have one output value and type per time. Below is an example of using `AzureSpeechTextToAudioConverter`, which has an input type of `text` and an output type of `audio_path`.
+# Audio converters enable transformations between text and audio, as well as audio-to-audio modifications. These converters are multi-modal and handle one input type and one output type at a time.
+#
+# ## Overview
+#
+# This notebook covers three categories of audio converters:
+#
+# - **[Text to Audio](#text-to-audio)**: Convert text into spoken audio files
+# - **[Audio to Text](#audio-to-text)**: Transcribe audio files into text
+# - **[Audio to Audio](#audio-to-audio)**: Modify audio files (e.g., frequency changes)
+
+# %% [markdown]
+# <a id="text-to-audio"></a>
+# ## Text to Audio
+#
+# The `AzureSpeechTextToAudioConverter` converts text input into audio output, generating spoken audio files.
 
 # %%
 import os
@@ -31,11 +45,13 @@ print(audio_convert_result)
 assert os.path.exists(audio_convert_result.output_text)
 
 # %% [markdown]
-# Similarly, below is an example of using `AzureSpeechAudioToTextConverter`, which has an input type of `audio_path` and an output type of `text`. We use the audio file created above.
+# <a id="audio-to-text"></a>
+# ## Audio to Text
+#
+# The `AzureSpeechAudioToTextConverter` transcribes audio files into text. Below we use the audio file created in the previous section.
 
 # %%
 import logging
-import os
 import pathlib
 
 from pyrit.common.path import DB_DATA_PATH
@@ -54,21 +70,13 @@ transcript = await speech_text_converter.convert_async(prompt=prompt)  # type: i
 print(transcript)
 
 # %% [markdown]
-# # Audio Frequency Converter
+# <a id="audio-to-audio"></a>
+# ## Audio to Audio
 #
-# The **Audio Frequency Converter** increases the frequency of a given audio file, enabling the probing of audio modality targets with heightened frequencies.
-#
+# The `AudioFrequencyConverter` modifies audio files by increasing their frequency, enabling the probing of audio modality targets with heightened frequencies.
 
 # %%
-import logging
-import os
-import pathlib
-
-from pyrit.common.path import DB_DATA_PATH
 from pyrit.prompt_converter import AudioFrequencyConverter
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 # Use audio file created above
 assert os.path.exists(audio_convert_result.output_text)

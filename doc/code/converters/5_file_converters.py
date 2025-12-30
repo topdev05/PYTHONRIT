@@ -10,24 +10,29 @@
 # ---
 
 # %% [markdown]
-# # PDFConverter - optional
+# # 5. File Converters
 #
-# This script demonstrates the use of the `PDFConverter` for generating PDFs in two different modes:
+# File converters transform text into file outputs such as PDFs. These converters are useful for packaging prompts into distributable formats.
 #
-# - **Template-Based PDF Generation**: Utilize a YAML template to render dynamic content into a PDF.
-# - **Direct Prompt PDF Generation**: Convert plain string prompts into PDFs without using a template.
+# ## Overview
 #
-# The `PromptSendingAttack` is used to handle the interaction with the `PDFConverter` and the mock `TextTarget` target system.
+# This notebook covers:
 #
-# ## Key Features
+# - **PDFConverter**: Convert text to PDF documents with templates or direct generation
+
+# %% [markdown]
+# ## PDFConverter
 #
-# 1. **Template-Based Generation**:
-#    - Populate placeholders in a YAML-based template using dynamic data.
-#    - Convert the rendered content into a PDF using the `PDFConverter`.
+# The `PDFConverter` generates PDF documents from text in multiple modes:
 #
-# 2. **String-Based Generation**:
-#    - Accept plain string prompts directly.
-#    - Generate PDFs from the provided string without using any template.
+# 1. **Template-Based PDF Generation**: Use YAML templates to render dynamic content into PDFs
+# 2. **Direct Prompt PDF Generation**: Convert plain text strings into PDFs without templates
+# 3. **Modify Existing PDFs**: Inject text into existing PDF documents
+
+# %% [markdown]
+# ### Template-Based PDF Generation
+#
+# This mode populates placeholders in a YAML-based template and converts the rendered content into a PDF.
 
 # %%
 import pathlib
@@ -62,7 +67,7 @@ if not template_path.exists():
 # Load the SeedPrompt from the YAML file
 prompt_template = SeedPrompt.from_yaml_file(template_path)
 
-# Initialize the Azure OpenAI chat target (or mock target if not needed)
+# Initialize target
 prompt_target = TextTarget()
 
 # Initialize the PDFConverter
@@ -82,27 +87,26 @@ converter_config = AttackConverterConfig(
     request_converters=pdf_converter,
 )
 
-# Define a single prompt for the attack
+# Define prompt for the attack
 prompt = str(prompt_data)
 
 # Initialize the attack
 attack = PromptSendingAttack(
-    objective_target=prompt_target,  # Target system (Azure OpenAI or other LLM target)
-    attack_converter_config=converter_config,  # Attach the PDFConverter
+    objective_target=prompt_target,
+    attack_converter_config=converter_config,
 )
 
 result = await attack.execute_async(objective=prompt)  # type: ignore
 await ConsoleAttackResultPrinter().print_conversation_async(result=result)  # type: ignore
 
 # %% [markdown]
-# # Direct Prompt PDF Generation (No Template)
+# ### Direct Prompt PDF Generation (No Template)
+#
+# This mode converts plain text strings directly into PDFs without using templates.
 
 # %%
 # Define a simple string prompt (no templates)
 prompt = "This is a simple test string for PDF generation. No templates here!"
-
-# Initialize the TextTarget (mock target for testing)
-prompt_target = TextTarget()
 
 # Initialize the PDFConverter without a template
 pdf_converter = PromptConverterConfiguration.from_converters(
@@ -131,20 +135,17 @@ result = await attack.execute_async(objective=prompt)  # type: ignore
 await ConsoleAttackResultPrinter().print_conversation_async(result=result)  # type: ignore
 
 # %% [markdown]
-# # Modify Existing PDF with Injection Items
+# ### Modifying Existing PDFs with Injection Items
+#
+# The `PDFConverter` can also inject text into existing PDF documents at specified locations.
+
 # %%
 import tempfile
 from pathlib import Path
 
 import requests
 
-from pyrit.prompt_converter import PDFConverter
-from pyrit.prompt_target import TextTarget
-from pyrit.setup import IN_MEMORY, initialize_pyrit_async
-
-await initialize_pyrit_async(memory_db_type=IN_MEMORY)  # type: ignore
-
-# This file isn't copied to our pipeline
+# Download a sample PDF
 url = "https://raw.githubusercontent.com/Azure/PyRIT/main/pyrit/datasets/prompt_converters/pdf_converters/fake_CV.pdf"
 
 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
@@ -175,17 +176,11 @@ injection_items = [
     },  # Blue text
 ]
 
-# Define a simple string prompt (no templates)
-prompt = "This is a simple test string for PDF generation. No templates here!"
-
-# Initialize the TextTarget (mock target for testing)
-prompt_target = TextTarget()
-
 # Initialize the PDFConverter with the existing PDF and injection items
 pdf_converter = PromptConverterConfiguration.from_converters(
     converters=[
         PDFConverter(
-            prompt_template=None,  # No template provided
+            prompt_template=None,
             font_type="Arial",
             font_size=12,
             page_width=210,
@@ -206,5 +201,5 @@ attack = PromptSendingAttack(
     attack_converter_config=converter_config,
 )
 
-result = await attack.execute_async(objective=prompt)  # type: ignore
+result = await attack.execute_async(objective="Modify existing PDF")  # type: ignore
 await ConsoleAttackResultPrinter().print_conversation_async(result=result)  # type: ignore

@@ -9,13 +9,24 @@
 # ---
 
 # %% [markdown]
-# # 7. Video Converters
+# # 4. Video Converters
 #
-# ## Adding Images to a Video
+# Video converters enable transformations involving video files, particularly adding images to videos.
 #
-# Adds an image to a video.
-# To use this converter you'll need to install opencv which can be done with
-# `pip install pyrit[opencv]`
+# ## Overview
+#
+# This notebook covers:
+#
+# - **[Image to Video](#image-to-video)**: Add images to video files
+
+# %% [markdown]
+# <a id="image-to-video"></a>
+# ## Image to Video
+#
+# ### AddImageVideoConverter
+#
+# The `AddImageVideoConverter` adds an image overlay to a video file.
+# To use this converter you'll need to install opencv which can be done with `pip install pyrit[opencv]`
 
 # %%
 import pathlib

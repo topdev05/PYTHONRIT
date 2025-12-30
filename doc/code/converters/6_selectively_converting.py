@@ -13,7 +13,7 @@
 # ---
 
 # %% [markdown]
-# # 5. Selectively Converting
+# # 6. Selectively Converting
 #
 # There are times when you want to convert pieces of a prompt, and not the whole thing. This notebook demonstrates how to selectively convert portions of text in your prompts.
 #

@@ -9,7 +9,7 @@
 # ---
 
 # %% [markdown]
-# # 6. Human in the Loop Converter
+# # 7. Human in the Loop Converter
 #
 # The Human in the Loop Converter allows a user to review each prompt before sending it to a target, allowing for closer moderation of multi-turn conversations.
 # The user can choose to send the prompt as is, modify the prompt, or run the prompt through one of the passed-in converters before sending it.
@@ -25,7 +25,7 @@
 # them; however, you can if you wish to alter the feedback for generating the next prompt.
 #
 #
-# # Before you begin, ensure you are setup with the correct version of [PyRIT installed](../../index.md#Installation-Guide) and have [secrets configured](../../setup/populating_secrets.md).
+# Before you begin, ensure you are setup with the correct version of [PyRIT installed](../../index.md#installation-guide) and have [secrets configured](../../setup/populating_secrets.md).
 #
 
 # %%
